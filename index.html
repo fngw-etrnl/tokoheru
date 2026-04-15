@@ -160,7 +160,7 @@
                 });
                 syncToGoogleSheets('ADD_TRANSACTION', finalTrx);
                 setBalances(prev => {
-                  let newBalances = { ...prev };
+                  const newBalances = { ...prev };
                   if (finalTrx.method === 'Cash') newBalances.kembalian += finalTrx.total;
                   else if (finalTrx.method === 'EDC BRILink') newBalances.bank += finalTrx.total;
                   finalTrx.items.forEach(i => {
