@@ -25,7 +25,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
-    <style>
+      <style>
         @media print {
           @page { size: 58mm auto; margin: 0; }
           body { margin: 0; padding: 0; }
@@ -81,12 +81,8 @@
       const [products, setProducts] = useState([]);
       const [categories, setCategories] = useState([]);
       const [transactions, setTransactions] = useState([]);
-      const [balances, setBalances] = useState({
-        kembalian: 0,
-        pulsa: 0,
-        bank: 0
-      });
-      const [storeConfig, setStoreConfig] = useState({ name: 'Toko Mas Heru', address: ", phone: ", footer: "});
+      const [balances, setBalances] = useState({ kembalian: 0, pulsa: 0, bank: 0 });
+      const [storeConfig, setStoreConfig] = useState({ name: 'Toko Mas Heru', address: '', phone: '', footer: ''});
 
       // 1. FUNGSI SINKRONISASI (Ditaruh di atas agar bisa dipanggil)
       const syncToGoogleSheets = async (action, data) => {
@@ -112,17 +108,13 @@
               body: JSON.stringify({ action: 'GET_INITIAL_DATA' })
             });
             const result = await res.json();
-            
             if (result.status === 'success') {
               // --- AUTOSAVE PROCESS ---
               setProducts(result.data.products || []);
               setCategories(result.data.categories || []);
               setTransactions(result.data.transactions || []); // Riwayat masuk!
               
-              if (result.data.balances) {
-                setBalances(result.data.balances); // Saldo masuk!
-              }
-              
+              if (result.data.balances) setBalances(result.data.balances); // Saldo masuk!
               if (result.data.storeConfig) setStoreConfig(result.data.storeConfig);
             }
           } catch (e) {
@@ -159,20 +151,14 @@
               transactions={transactions}
               onLogout={() => { setUserRole(null); setCashierId(''); }}
               onTransactionSuccess={(trx) => {
-                const finalTrx = {
-                  ...trx,
-                  cashierId: cashierId // Memastikan ID Kasir masuk
-                };
-
+                const finalTrx = { ...trx, cashierId: cashierId };// Memastikan ID Kasir masuk
                 setTransactions(prev => {
                   // CEK: Jika ID transaksi sudah ada di list, jangan tambah lagi
                   const isDuplicate = prev.find(t => t.id === finalTrx.id);
-                  if (isDuplicate) return prev;
-                  return [finalTrx, ...prev];
+                    if (isDuplicate) return prev;
+                    return [finalTrx, ...prev];
                 });
-
                 syncToGoogleSheets('ADD_TRANSACTION', finalTrx);
-              
                 setBalances(prev => {
                   let nb = { ...prev };
                   if (finalTrx.method === 'Cash') nb.kembalian += finalTrx.total;
@@ -182,14 +168,12 @@
                     else if (['Pulsa', 'Paket Data'].includes(i.category)) nb.pulsa -= (i.price * i.qty);
                     else if (i.category === 'Transfer') nb.bank -= (i.price * i.qty);
                   });
-
-                  syncToGoogleSheets('UPDATE_BALANCES', newBalances);
-                  return newBalances;
+                  syncToGoogleSheets('UPDATE_BALANCES', nb);
+                  return nb;
                 });
               }}
             />
           )}
-
           {userRole === 'admin' && (
             <AdminDashboard 
               products={products} setProducts={setProducts}
