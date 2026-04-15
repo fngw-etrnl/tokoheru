@@ -235,11 +235,11 @@
               text: result.message || 'Kode Kasir atau PIN salah / akun nonaktif!' 
             });
           }
-        } catch (err) {
+          catch (err) {
           console.error("Login Error:", err);
           showAlert({ icon: 'error', title: 'Error', text: 'Koneksi database bermasalah.' });
-        }
-      };
+          }
+          };
 
       return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 p-4">
