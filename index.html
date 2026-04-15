@@ -25,16 +25,22 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
-      <style>
-        @media print {
-          @page { size: 58mm auto; margin: 0; }
-          body { margin: 0; padding: 0; }
-          #root, .no-print { display: none !important; }
-          #print-invoice { display: block !important; width: 58mm; padding: 4mm; font-family: 'Courier New', monospace; font-size: 9pt; background: white; }
-        }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .material-symbols-outlined { vertical-align: middle; font-size: inherit; }
-      </style>
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #print-invoice, #print-invoice * { visibility: visible; }
+      #print-invoice { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background: white; }
+      .no-print { display: none !important; }
+    }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* Penyesuaian ikon agar center vertikal */
+    .material-symbols-outlined {
+      vertical-align: middle;
+      font-size: inherit;
+    }
+  </style>
   
       <meta name="mobile-web-app-capable" content="yes">
       <meta name="apple-mobile-web-app-capable" content="yes">
@@ -57,13 +63,26 @@
     // --- CONFIGURATION ---
     const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz-Um422Lqpxfi1OzEz6v9ahpu_T12lfT5jKqG6miqJ3FFAqfpOwUzfrTFaVYAPypvi/exec";
 
+    // --- DUMMY INITIAL DATA ---
+    const initialCategories = [
+      { id: 1, name: 'Pulsa' },
+      { id: 2, name: 'Paket Data' },
+      { id: 3, name: 'Transfer' },
+      { id: 4, name: 'Jual Beli' },
+      { id: 5, name: 'Service' }
+    ];
+    const initialProducts = [
+      { id: 'P001', name: 'Samsung S25', price: 25000, category: 'Jual Beli', stock: 50 },
+      { id: 'P002', name: '20.000', price: 5000, category: 'Pulsa', stock: 100 },
+      { id: 'P003', name: 'Paket Indosat 1Gb', price: 18000, category: 'Paket Data', stock: 40 },
+      { id: 'P004', name: 'Trasfer Bank', price: 1015000, category: 'Transfer', stock: 30 },
+      { id: 'P005', name: 'Ganti LCD Iphone', price: 20000, category: 'Service', stock: 25 },
+    ];
+
     const formatRp = (number) => {
       return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
     };
 
-    // --- KOMPONEN IKON ---
-    const Icon = ({ name, className = "" }) => <span className={`material-symbols-outlined ${className}`}>{name}</span>;
-    
     const showAlert = (options) => {
       if (window.Swal) {
         window.Swal.fire({ fontFamily: 'sans-serif', ...options });
@@ -72,16 +91,33 @@
       }
     };
 
+    // --- KOMPONEN IKON ---
+    const Icon = ({ name, className = "" }) => (
+      <span className={`material-symbols-outlined ${className}`}>{name}</span>
+    );
+
     function App() {
       const [userRole, setUserRole] = useState(null);
       const [cashierId, setCashierId] = useState('');
       const [loading, setLoading] = useState(true);
+      
+      // State untuk menampung data dari Google Sheets
       const [products, setProducts] = useState([]);
       const [categories, setCategories] = useState([]);
       const [transactions, setTransactions] = useState([]);
-      const [balances, setBalances] = useState({ kembalian: 0, pulsa: 0, bank: 0 });
-      const [storeConfig, setStoreConfig] = useState({ name: 'Toko Mas Heru', address: '', phone: '', footer: ''});
-    
+      const [balances, setBalances] = useState({
+        kembalian: 0,
+        pulsa: 0,
+        bank: 0
+      });
+      const [storeConfig, setStoreConfig] = useState({
+        name: 'Toko Mas Heru',
+        address: 'Loading...',
+        phone: 'Loading...',
+        footer: 'Loading...'
+      });
+
+      // 1. FUNGSI SINKRONISASI (Ditaruh di atas agar bisa dipanggil)
       const syncToGoogleSheets = async (action, data) => {
         try {
           await fetch(APP_SCRIPT_URL, {
@@ -89,9 +125,13 @@
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action, data, timestamp: new Date().toISOString() })
           });
-        } catch (error) { console.error("Sync Error:", error); }
+          console.log(`[Sync Success] Action: ${action}`);
+        } catch (error) {
+          console.error("Gagal sinkronisasi:", error);
+        }
       };
-    
+
+      // 2. FUNGSI LOAD DATA AWAL (Autosave Feature)
       useEffect(() => {
         const loadData = async () => {
           try {
@@ -101,58 +141,106 @@
               body: JSON.stringify({ action: 'GET_INITIAL_DATA' })
             });
             const result = await res.json();
+            
             if (result.status === 'success') {
+              // --- AUTOSAVE PROCESS ---
               setProducts(result.data.products || []);
               setCategories(result.data.categories || []);
-              setTransactions(result.data.transactions || []);
-              if (result.data.balances) setBalances(result.data.balances);
+              setTransactions(result.data.transactions || []); // Riwayat masuk!
+              
+              if (result.data.balances) {
+                setBalances(result.data.balances); // Saldo masuk!
+              }
+              
               if (result.data.storeConfig) setStoreConfig(result.data.storeConfig);
             }
-          } catch (e) { console.error("Load Error", e); }
-          finally { setLoading(false); }
+          } catch (e) {
+            console.error("Gagal load data awal", e);
+            showAlert({ icon: 'error', title: 'Offline Mode', text: 'Gagal sinkron data cloud.' });
+          } finally {
+            setLoading(false);
+          }
         };
         loadData();
       }, []);
-    
-      if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white">MEMUAT DATA...</div>;
-      if (!userRole) return <LoginScreen onLogin={(role, code) => { setUserRole(role); setCashierId(code); }} />;
-    
+
+      if (loading) {
+        return (
+          <div className="h-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="font-bold tracking-widest text-lg">MEMUAT DATA ...</p>
+          </div>
+        );
+      }
+
+      if (!userRole) {
+        return <LoginScreen onLogin={(role, code) => { setUserRole(role); setCashierId(code); }} />;
+      }
+
       return (
-        <div className="min-h-screen bg-slate-50">
-          {userRole === 'kasir' ? (
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
+          {userRole === 'kasir' && (
             <KasirDashboard 
-              products={products} categories={categories} storeConfig={storeConfig}
-              cashierId={cashierId} transactions={transactions}
+              products={products} 
+              categories={categories}
+              storeConfig={storeConfig}
+              cashierId={cashierId}
+              transactions={transactions}
               onLogout={() => { setUserRole(null); setCashierId(''); }}
               onTransactionSuccess={(trx) => {
-                setTransactions(prev => [trx, ...prev]);
-                syncToGoogleSheets('ADD_TRANSACTION', trx);
+                const finalTrx = {
+                  ...trx,
+                  cashierId: cashierId // Memastikan ID Kasir masuk
+                };
+
+                setTransactions(prev => {
+                  // CEK: Jika ID transaksi sudah ada di list, jangan tambah lagi
+                  const isDuplicate = prev.find(t => t.id === finalTrx.id);
+                  if (isDuplicate) return prev;
+                  return [finalTrx, ...prev];
+                });
+
+                syncToGoogleSheets('ADD_TRANSACTION', finalTrx);
+              
                 setBalances(prev => {
-                  const nb = { ...prev }; // Kita pakai 'nb' supaya pendek dan tidak typo
-                  if (trx.method === 'Cash') nb.kembalian += trx.total;
-                  else if (trx.method === 'EDC BRILink') nb.bank += trx.total;
-                  trx.items.forEach(i => {
-                    const sub = i.price * i.qty;
-                    if (i.category === 'Tarik Tunai') nb.kembalian -= sub;
-                    else if (['Pulsa', 'Paket Data'].includes(i.category)) nb.pulsa -= sub;
-                    else if (i.category === 'Transfer') nb.bank -= sub;
+                  const newBalances = { ...prev };
+
+                  // Jika Cash, uang masuk ke Laci (Kembalian)
+                  if (trx.method === 'Cash') {
+                    newBalances.kembalian += trx.total;
+                  } 
+                  
+                  // Logika pemotongan saldo modal (Pulsa/Transfer) tetap jalan:
+                  trx.items.forEach(item => {
+                    if (item.category === 'Pulsa' || item.category === 'Paket Data') {
+                      newBalances.pulsa -= (item.price * item.qty);
+                    } else if (item.category === 'Transfer') {
+                      newBalances.bank -= (item.price * item.qty);
+                    }
                   });
-                  syncToGoogleSheets('UPDATE_BALANCES', nb);
-                  return nb;
+
+                  syncToGoogleSheets('UPDATE_BALANCES', newBalances);
+                  return newBalances;
                 });
               }}
             />
-          ) : (
+          )}
+
+          {userRole === 'admin' && (
             <AdminDashboard 
-              products={products} setProducts={setProducts} categories={categories} setCategories={setCategories}
-              transactions={transactions} balances={balances} setBalances={setBalances}
+              products={products} setProducts={setProducts}
+              categories={categories} setCategories={setCategories}
+              transactions={transactions}
+              balances={balances} setBalances={setBalances}
               storeConfig={storeConfig} setStoreConfig={setStoreConfig}
-              onLogout={() => setUserRole(null)} syncToSheets={syncToGoogleSheets}
+              onLogout={() => setUserRole(null)}
+              syncToSheets={syncToGoogleSheets}
             />
           )}
         </div>
       );
     }
+
     // ==========================================
     // 1. LOGIN SCREEN
     // ==========================================
@@ -248,13 +336,12 @@
     // 2. KASIR DASHBOARD (POS)
     // ==========================================
     function KasirDashboard({ products, categories, storeConfig, cashierId, transactions, onLogout, onTransactionSuccess }) {
-      const [refNumber, setRefNumber] = useState(''); // WAJIB ADA INI BRO!
-      const [cart, setCart] = useState([]);
-      const [showPayment, setShowPayment] = useState(false);
       const [paymentMethod, setPaymentMethod] = useState('Cash');
+      const [cart, setCart] = useState([]);
       const [searchQuery, setSearchQuery] = useState('');
-      const [paymentAmount, setPaymentAmount] = useState('');
       const [activeCategory, setActiveCategory] = useState('Semua');
+      const [paymentAmount, setPaymentAmount] = useState('');
+      const [showPayment, setShowPayment] = useState(false);
       const [lastInvoice, setLastInvoice] = useState(null);
       const [showHistory, setShowHistory] = useState(false);
       const [isMobileCartOpen, setIsMobileCartOpen] = useState(false); // State baru untuk panel keranjang di HP
@@ -516,7 +603,7 @@
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Metode Pembayaran</label>
                     <div className="grid grid-cols-3 gap-2">
-                      {['Cash', 'E-Wallet', 'Transfer','EDC BRILink'].map(m => (
+                      {['Cash', 'E-Wallet', 'Transfer'].map(m => (
                         <button
                           key={m}
                           onClick={() => setPaymentMethod(m)}
@@ -527,12 +614,8 @@
                           {m}
                         </button>
                       ))}
-                      {/* EDC BRILink */}
-                    {paymentMethod==='EDC BRILink' && <input type="text" placeholder="No. Referensi EDC" value={refNumber} onChange={e=>setRefNumber(e.target.value)} className="w-full p-3 border rounded-xl mb-4" />}
-                      {<input type="text" placeholder="Nominal Bayar" value={paymentAmount} onChange={e=>setPaymentAmount(e.target.value.replace(/\D/g,''))} className="w-full p-3 border rounded-xl mb-6 text-2xl font-bold text-center" />}
                     </div>
-                
-                  {/* Nominal Pembayaran */}
+                  </div>
                   <div className="grid grid-cols-3 gap-2 mb-8">
                     {[50000, 100000, totalBelanja].map((amount, idx) => (
                       <button key={idx} onClick={() => setPaymentAmount(new Intl.NumberFormat('id-ID').format(amount))} className="py-2 px-2 bg-indigo-50 text-indigo-600 font-semibold rounded-lg hover:bg-indigo-100 transition-colors text-sm">
@@ -576,7 +659,7 @@
                 <div className="flex justify-between"><span>Kembali:</span><span>{formatRp(lastInvoice.change)}</span></div>
               </div>
               <div className="text-center mt-6 border-t border-dashed border-gray-400 pt-4 text-xs">
-                <p>{storeConfig.footer}</p><p className="mt-2 text-gray-500">~ Barang yang sudah dibeli tidak bisa dikembalikan lagi kecuali ada perjanjian khusus ~</p>
+                <p>{storeConfig.footer}</p><p className="mt-2 text-gray-500">~ Terimakasih ~</p>
               </div>
             </div>
           )}
