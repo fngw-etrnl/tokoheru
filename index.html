@@ -310,7 +310,8 @@
           total: totalBelanja, 
           payment: bayar, 
           change: bayar - totalBelanja,
-          method: paymentMethod // <--- Kirim metode yang dipilih
+          method: paymentMethod, // <--- Kirim metode yang dipilih
+          refNumber: refNumber // <--- Tambahkan ini supaya nomor EDC tersimpan!
         };
         
         finishTransaction(transactionData);
@@ -493,44 +494,24 @@
 
             {/* MODAL PEMBAYARAN */}
             {showPayment && (
-              <div className="fixed inset-0 bg-white z-50 flex flex-col">
-                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-gray-800">Pembayaran</h2>
-                  <button onClick={() => setShowPayment(false)} className="text-gray-400 hover:text-gray-600"><Icon name="close" /></button>
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white p-6 rounded-2xl w-full max-w-md">
+                <h3 className="text-xl font-bold mb-4">Pembayaran</h3>
+                <div className="text-3xl font-bold text-indigo-600 mb-6 text-center">{formatRp(total)}</div>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {['Cash', 'E-Wallet', 'Transfer', 'EDC BRILink'].map(m => (
+                    <button key={m} onClick={()=>setPaymentMethod(m)} className={`py-2 rounded-lg font-bold ${paymentMethod===m?'bg-indigo-600 text-white':'bg-gray-100'}`}>{m}</button>
+                  ))}
                 </div>
-                <div className="p-6 flex-1 flex flex-col justify-center">
-                  <div className="text-center mb-8">
-                    <p className="text-gray-500 font-medium mb-1">Total Tagihan</p>
-                    <div className="text-4xl font-bold text-indigo-600">{formatRp(totalBelanja)}</div>
-                  </div>
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nominal Uang Diterima</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
-                      <input type="text" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-300 rounded-xl text-2xl font-bold focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0" value={paymentAmount} onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '');
-                          setPaymentAmount(val ? new Intl.NumberFormat('id-ID').format(val) : '');
-                        }} autoFocus />
-                    </div>
-                  </div>
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Metode Pembayaran</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['Cash', 'E-Wallet', 'Transfer','EDC BRILink'].map(m => (
-                        <button
-                          key={m}
-                          onClick={() => setPaymentMethod(m)}
-                          className={`py-2 px-1 rounded-xl font-bold text-xs transition-all ${
-                            paymentMethod === m ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-600'
-                          }`}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                      {/* EDC BRILink */}
-                    {paymentMethod==='EDC BRILink' && <input type="text" placeholder="No. Referensi EDC" value={refNumber} onChange={e=>setRefNumber(e.target.value)} className="w-full p-3 border rounded-xl mb-4" />}
-                      {<input type="text" placeholder="Nominal Bayar" value={paymentAmount} onChange={e=>setPaymentAmount(e.target.value.replace(/\D/g,''))} className="w-full p-3 border rounded-xl mb-6 text-2xl font-bold text-center" />}
-                    </div>
+                {paymentMethod==='EDC BRILink' && <input type="text" placeholder="No. Referensi EDC" value={refNumber} onChange={e=>setRefNumber(e.target.value)} className="w-full p-3 border rounded-xl mb-4" />}
+                <input type="text" placeholder="Nominal Bayar" value={paymentAmount} onChange={e=>setPaymentAmount(e.target.value.replace(/\D/g,''))} className="w-full p-3 border rounded-xl mb-6 text-2xl font-bold text-center" />
+                <div className="flex gap-2">
+                  <button onClick={()=>setShowPayment(false)} className="flex-1 py-3 bg-gray-100 rounded-xl">Batal</button>
+                  <button onClick={handleFinish} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold">CETAK</button>
+                </div>
+              </div>
+            </div>
+          )}
                 
                   {/* Nominal Pembayaran */}
                   <div className="grid grid-cols-3 gap-2 mb-8">
