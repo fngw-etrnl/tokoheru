@@ -27,6 +27,23 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
       <style>
+        /* Biar konten tidak ketutup tombol 'Lihat Pesanan' di bawah */
+        .main-content {
+          height: calc(100vh - 80px); /* Sesuaikan tinggi header */
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Hilangkan gap putih di atas pada iPhone (safe area) */
+        body {
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* Buat scrollbar cantik */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        
         @media print {
           @page { size: 58mm auto; margin: 0; }
           body { margin: 0; padding: 0; }
@@ -660,20 +677,22 @@
               ))}
             </div>
 
-            {/* SEKSI AKSI CEPAT */}
-            <div className="px-4 md:px-6 mb-6">
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 backdrop-blur-md rounded-[2rem] p-6 shadow-md">
+            {/* SEKSI AKSI CEPAT - Diperbaiki agar tidak numpuk */}
+            <div className="px-4 mb-6">
+              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 backdrop-blur-md rounded-3xl p-4 shadow-sm border border-white/20">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {quickActions.map((action) => (
                     <button
                       key={action.id}
-                      onClick={() => handleQuickAction({ ...action, price: 0, category: action.name.split(' ')[1] || 'Layanan' })}
-                      className="group flex flex-col items-center justify-center p-4 bg-white rounded-2xl border-2 indigo-500 hover:border-amber-500 hover:bg-grey-500/50 hover:shadow-xl transition-all active:scale-95"
+                      onClick={() => handleQuickAction(action)}
+                      className="group flex flex-col items-center justify-center p-3 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-95 border border-slate-100"
                     >
-                      <div className={`${action.color} text-white p-3 rounded-2xl mb-2 shadow-lg shadow-gray-200 group-hover:scale-110 transition-transform`}>
-                        <Icon name={action.icon} className="text-2xl" />
+                      <div className={`${action.color} text-white p-2 md:p-3 rounded-xl mb-2 shadow-lg group-hover:scale-110 transition-transform`}>
+                        <Icon name={action.icon} className="text-xl md:text-2xl" />
                       </div>
-                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-tight text-center">{action.name}</span>
+                      <span className="text-[10px] md:text-xs font-bold text-slate-600 uppercase text-center leading-tight">
+                        {action.name}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -682,43 +701,34 @@
 
             {/* Tambahkan padding bottom ekstra (pb-24) di HP agar tidak tertutup tombol melayang */}
             <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-6">
-              {/* DAFTAR PRODUK - Ukuran diperkecil */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-24">
-                    {filteredProducts.map(product => (
-                        <div 
-                            key={product.id} 
-                            onClick={() => addToCart(product)} 
-                            className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 hover:border-indigo-400 cursor-pointer transition-all active:scale-95 flex flex-col h-full"
-                        >
-                            {/* Box Ikon/Gambar diperkecil h-20 */}
-                            <div className="h-20 bg-slate-50 rounded-xl mb-2 flex items-center justify-center overflow-hidden">
-                                {product.image ? (
-                                    <img 
-                                        src={product.image} 
-                                        alt={product.name} 
-                                        className="w-full h-full object-cover shadow-inner"
-                                        onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=No+Image'; }} // Jika link mati
-                                    />
-                                ) : (
-                                    <Icon name="inventory_2" className="text-slate-200 text-2xl" />
-                                )}
-                            </div>
-                            
-                            {/* Teks diperkecil pakai text-[11px] */}
-                            <h4 className="font-bold text-[11px] uppercase text-slate-700 line-clamp-1 mb-1">
-                                {product.name}
-                            </h4>
-                            
-                            <div className="flex justify-between items-end mt-auto">
-                                <p className="text-indigo-600 font-black text-xs">
-                                    {product.price === 0 ? "Nominal" : formatRp(product.price)}
-                                </p>
-                                <span className="text-[9px] text-slate-300 font-bold">
-                                    Stok: {product.stock}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
+                {/* DAFTAR PRODUK - 2 Kolom di HP, 4-5 di Desktop */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-32">
+                  {filteredProducts.map(product => (
+                    <div 
+                      key={product.id} 
+                      onClick={() => addToCart(product)} 
+                      className="bg-white p-3 rounded-2xl shadow-sm border border-slate-50 hover:border-indigo-200 transition-all active:scale-95 flex flex-col"
+                    >
+                      <div className="aspect-square bg-slate-50 rounded-xl mb-2 flex items-center justify-center overflow-hidden">
+                        {product.image ? (
+                          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Icon name="inventory_2" className="text-slate-200 text-3xl" />
+                        )}
+                      </div>
+                      <h4 className="font-bold text-[11px] md:text-xs uppercase text-slate-700 line-clamp-2 h-8 mb-1">
+                        {product.name}
+                      </h4>
+                      <div className="flex justify-between items-center mt-auto">
+                        <p className="text-indigo-600 font-black text-xs">
+                          {product.price === 0 ? "Manual" : formatRp(product.price)}
+                        </p>
+                        <span className="text-[9px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-md">
+                          {product.stock}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
             </div>
           </div>
