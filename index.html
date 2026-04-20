@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Toko Mas Heru</title>
   
   <!-- Tailwind CSS -->
@@ -32,7 +32,7 @@
           padding: 0;
           /* Gunakan padding-top agar teks gak ketutup jam, 
              tapi pastikan background-color-nya sama dengan warna header lo */
-          padding-top: calc(env(safe-area-inset-top) + 20px);
+          padding-top: env(safe-area-inset-top);
           background-color: #4f46e5; /* GANTI sesuai warna header Toko Heru lo */
           min-height: 100vh;
         }
@@ -62,13 +62,13 @@
           height: 100dvh; /* Dynamic viewport biar gak kepotong bar browser mobile */
         }
         /* Mencegah tarikan naik-turun di browser mobile */
-        html, body {
+        /*html, body {
           margin: 0;
           padding: 0;
           width: 100%;
           height: 100%;
           /*overflow: hidden; /* Biar body utama gak bisa scroll */
-          overscroll-behavior: none; /* Kunci biar gak ada efek membal/bounce */
+          /*overscroll-behavior: none; /* Kunci biar gak ada efek membal/bounce */
         }
         /* Khusus buat LoginScreen biar tingginya pas 100% layar HP */
         .login-container {
@@ -76,7 +76,7 @@
           display: flex;
           align-items: center;
           justify-content: center;
-          /*touch-action: none; /* Matiin interaksi sentuh buat scroll di area ini */
+          touch-action: none; /* Matiin interaksi sentuh buat scroll di area ini */
         }
         /* .material-symbols-outlined { vertical-align: middle; font-size: inherit; } */
       </style>
