@@ -68,39 +68,25 @@
         }
         
         @media print {
-          @page { 
-            size: 58mm auto; 
-            margin: 0; 
-          }
+          @page { size: 58mm auto; margin: 0; }
+          body { background-color: white !important; margin: 0; padding: 0; }
           
-          body { 
-            background-color: white; 
-            margin: 0; 
-            padding: 0;
-          }
-        
-          /* 1. Bikin semua elemen di layar jadi tembus pandang/hilang */
-          body * {
-            visibility: hidden;
-          }
-        
-          /* 2. Tampilkan HANYA elemen struk dan isi di dalamnya */
-          #print-invoice, #print-invoice * {
-            visibility: visible;
-          }
-        
-          /* 3. Tarik struknya secara paksa ke pojok kiri atas kertas */
-          #print-invoice {
+          /* Sembunyikan SELURUH elemen asli di body saat print (termasuk dashboard React) */
+          body > * { display: none !important; }
+          
+          /* TAMPILKAN HANYA kloningan struk yang kita injek lewat JavaScript nanti */
+          body > #print-clone {
+            display: block !important;
             position: absolute;
-            left: 0;
             top: 0;
+            left: 0;
             width: 58mm;
             padding: 4mm;
-            margin: 0;
             background: white;
+            color: black !important;
           }
         }
-
+        
         .h-screen {
           height: 100vh; 
           height: 100dvh; /* Dynamic viewport biar gak kepotong bar browser mobile */
@@ -624,7 +610,25 @@
           element.classList.add('hidden'); // Sembunyikan lagi
         });
       };
-
+      
+      const handlePrint = () => {
+        const printElement = document.getElementById('print-invoice');
+        if (!printElement) return;
+        
+        // 1. Buat kloningan elemen struk persis sama
+        const clone = printElement.cloneNode(true);
+        clone.id = 'print-clone'; // Kasih ID baru biar kebaca sama CSS Print kita
+        
+        // 2. Tempel langsung ke body HTML (keluar dari modal React yang rumit)
+        document.body.appendChild(clone);
+        
+        // 3. Trigger layar print bawaan HP/Laptop
+        window.print();
+        
+        // 4. Bersihkan lagi setelah layar print ditutup biar memori nggak bocor
+        document.body.removeChild(clone);
+      };
+      
       const processPayment = () => {
         const bayar = parseInt(paymentAmount.replace(/\D/g, '')) || 0;
         if (bayar < totalBelanja) {
@@ -1040,7 +1044,7 @@
 
                 {/* Tombol Aksi */}
                 <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => window.print()} className="bg-indigo-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 font-bold active:scale-95 transition-all">
+                  <button onClick={handlePrint} className="bg-indigo-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 font-bold active:scale-95 transition-all">
                     <Icon name="print" /> Cetak
                   </button>
                   <button onClick={shareToWhatsApp} className="bg-green-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 font-bold active:scale-95 transition-all">
@@ -1439,6 +1443,56 @@
 
       // LOGIKA UNTUK MENGHASILKAN PDF
         const handleDownloadPDF = () => {
+          try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4'); // l = landscape
+        
+            // PAKSA WARNA HITAM MURNI BUKAN ABU-ABU
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(16);
+            doc.text(`Laporan Transaksi - ${storeConfig.name}`, 14, 20);
+            
+            doc.setFontSize(10);
+            doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 28);
+        
+            doc.setLineWidth(0.5);
+            doc.line(14, 32, 280, 32);
+        
+            const tableColumn = ["ID Transaksi", "Kasir", "Tanggal & Waktu", "Metode", "Item", "Total"];
+            const tableRows = transactions.map(trx => [
+              trx.id,
+              trx.cashierId || '-',
+              new Date(trx.date).toLocaleString('id-ID'),
+              trx.refNumber ? `${trx.method}\n(Ref: ${trx.refNumber})` : (trx.method || 'Cash'),
+              trx.items.map(i => `${i.qty}x ${i.name}`).join(', '),
+              formatRp(trx.total)
+            ]);
+        
+            // Eksekusi autoTable dengan paksaan warna teks
+            doc.autoTable({
+              head: [tableColumn],
+              body: tableRows,
+              startY: 38,
+              theme: 'grid',
+              headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], halign: 'center' },
+              styles: { textColor: [0, 0, 0] }, // PAKSA TEKS TABEL HITAM
+            });
+        
+            const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 40;
+            const grandTotal = transactions.reduce((sum, t) => sum + t.total, 0);
+            
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(0, 0, 0);
+            doc.text(`GRAND TOTAL: ${formatRp(grandTotal)}`, 280, finalY + 10, { align: 'right' });
+        
+            doc.save(`Laporan_Toko_Lek_Heru_${Date.now()}.pdf`);
+          } catch (error) {
+            console.error("Gagal cetak PDF:", error);
+            showAlert({ icon: 'error', title: 'Error', text: 'Gagal membuat PDF. Coba gunakan browser lain.' });
+          }
+        };
+      
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('l', 'mm', 'a4'); // 'l' untuk Landscape supaya kolomnya lega
 
