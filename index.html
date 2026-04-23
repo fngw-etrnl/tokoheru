@@ -542,6 +542,7 @@
               id: `QA-${Date.now()}`,
               name: vendor ? `${action.name} (${vendor})` : action.name,
               price: nominal + fee, 
+              modal: nominal, // <--- INJEKSI MODAL DI SINI
               category: action.name,
               qty: 1,
               note: `Nominal: ${nominal}, Admin: ${fee}`
@@ -622,7 +623,8 @@
                   const newItem = {
                     id: `PROD-${Date.now()}`,
                     name: `${p.name}`,
-                    price: nominal + fee, // Otomatis nambahin fee ke harga
+                    price: nominal + fee, 
+                    modal: nominal, // <--- INJEKSI MODAL DI SINI
                     category: p.category,
                     qty: 1,
                     note: `Nominal: ${nominal}, Admin: ${fee}`
@@ -1157,9 +1159,41 @@
     // ==========================================
     // 3. ADMIN DASHBOARD
     // ==========================================
-    function AdminDashboard({ products, setProducts, categories, setCategories, transactions, balances, setBalances, storeConfig, setStoreConfig, onLogout, syncToSheets }) {
+      function AdminDashboard({ products, setProducts, categories, setCategories, transactions, balances, setBalances, storeConfig, setStoreConfig, onLogout, syncToSheets }) {
       const [activeTab, setActiveTab] = useState('dashboard');
-      const totalPendapatan = transactions.reduce((sum, trx) => sum + trx.total, 0);
+
+      // --- LOGIKA PERHITUNGAN BARU ---
+      const isToday = (dateString) => {
+        const today = new Date();
+        const d = new Date(dateString);
+        return d.getDate() === today.getDate() &&
+               d.getMonth() === today.getMonth() &&
+               d.getFullYear() === today.getFullYear();
+      };
+
+      const transactionsToday = transactions.filter(trx => isToday(trx.date));
+
+      // 1. Penghasilan Kotor (Hari Ini) = Total transaksi hari ini
+      const kotorHariIni = transactionsToday.reduce((sum, trx) => sum + trx.total, 0);
+
+      // 2. Penghasilan Bersih (Hari Ini) = Keuntungan (Harga Jual - Harga Modal)
+      const bersihHariIni = transactionsToday.reduce((sum, trx) => {
+        let profitTrx = 0;
+        trx.items.forEach(item => {
+          const modal = item.modal || 0; // Ambil modal yang disimpan saat checkout
+          // Fallback buat riwayat transaksi lama yang belum punya record modal
+          if (!item.modal && item.note && item.note.includes('Admin: ')) {
+               const fee = parseInt(item.note.split('Admin: ')[1].replace(/\D/g, '')) || 0;
+               profitTrx += (fee * item.qty);
+          } else {
+               profitTrx += ((item.price - modal) * item.qty);
+          }
+        });
+        return sum + profitTrx;
+      }, 0);
+
+      // 3. Total Aset = Keseluruhan transaksi sepanjang masa
+      const totalAset = transactions.reduce((sum, trx) => sum + trx.total, 0);
 
       const navItems = [
         { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -1195,7 +1229,7 @@
               <h1 className="text-xl md:text-2xl font-bold text-gray-800">{navItems.find(i => i.id === activeTab)?.label}</h1>
               <div className="flex items-center gap-3">
                 <span className="bg-lime-100 text-lime-700 px-3 py-1 rounded-full text-xs md:text-sm font-semibold flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span> <span className="hidden md:inline">Online</span>Connected
+                  <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span> <span className="hidden md:inline">Online</span>
                 </span>
               </div>
             </div>
@@ -1214,20 +1248,55 @@
                      </div>
                   </div>
 
+                  {/* KARTU PENGHASILAN SESUAI GAMBAR */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-                      <div className="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center"><Icon name="attach_money" className="text-3xl" /></div>
-                      <div><p className="text-gray-500 text-sm font-medium">Total Pendapatan</p><h3 className="text-xl md:text-2xl font-bold text-gray-800">{formatRp(totalPendapatan)}</h3></div>
+                    {/* Card Kotor */}
+                    <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-3xl shadow-lg shadow-blue-200 text-white flex flex-col justify-between relative overflow-hidden">
+                      <Icon name="payments" className="absolute -right-4 -bottom-4 text-8xl text-white/20" />
+                      <div className="relative z-10">
+                        <p className="text-blue-100 text-sm font-bold mb-1 uppercase tracking-wider">Penghasilan Kotor</p>
+                        <p className="text-xs text-blue-200 mb-4 bg-white/20 inline-block px-2 py-1 rounded-md">Hari Ini</p>
+                        <h3 className="text-3xl font-black mb-1">{formatRp(kotorHariIni)}</h3>
+                        <p className="text-xs text-blue-100 opacity-80">Omzet + Modal hari ini</p>
+                      </div>
                     </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-                      <div className="w-14 h-14 bg-green-100 text-green-600 rounded-xl flex items-center justify-center"><Icon name="shopping_cart" className="text-3xl" /></div>
-                      <div><p className="text-gray-500 text-sm font-medium">Total Transaksi</p><h3 className="text-xl md:text-2xl font-bold text-gray-800">{transactions.length} Transaksi</h3></div>
+
+                    {/* Card Bersih */}
+                    <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 p-6 rounded-3xl shadow-lg shadow-emerald-200 text-white flex flex-col justify-between relative overflow-hidden">
+                      <Icon name="account_balance_wallet" className="absolute -right-4 -bottom-4 text-8xl text-white/20" />
+                      <div className="relative z-10">
+                        <p className="text-emerald-100 text-sm font-bold mb-1 uppercase tracking-wider">Penghasilan Bersih</p>
+                        <p className="text-xs text-emerald-200 mb-4 bg-white/20 inline-block px-2 py-1 rounded-md">Hari Ini</p>
+                        <h3 className="text-3xl font-black mb-1">{formatRp(bersihHariIni)}</h3>
+                        <p className="text-xs text-emerald-100 opacity-80">Total keuntungan bersih (margin)</p>
+                      </div>
                     </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-                      <div className="w-14 h-14 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><Icon name="inventory_2" className="text-3xl" /></div>
-                      <div><p className="text-gray-500 text-sm font-medium">Total Produk</p><h3 className="text-xl md:text-2xl font-bold text-gray-800">{products.length} Item</h3></div>
+
+                    {/* Card Aset */}
+                    <div className="bg-gradient-to-br from-purple-500 to-purple-700 p-6 rounded-3xl shadow-lg shadow-purple-200 text-white flex flex-col justify-between relative overflow-hidden">
+                      <Icon name="savings" className="absolute -right-4 -bottom-4 text-8xl text-white/20" />
+                      <div className="relative z-10">
+                        <p className="text-purple-100 text-sm font-bold mb-1 uppercase tracking-wider">Total Aset</p>
+                        <p className="text-xs text-purple-200 mb-4 bg-white/20 inline-block px-2 py-1 rounded-md">Sepanjang Masa</p>
+                        <h3 className="text-3xl font-black mb-1">{formatRp(totalAset)}</h3>
+                        <p className="text-xs text-purple-100 opacity-80">Akumulasi seluruh transaksi</p>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Info Tambahan */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                      <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><Icon name="shopping_cart" /></div>
+                      <div><p className="text-gray-500 text-xs font-medium">Transaksi Hari Ini</p><h3 className="text-lg font-bold text-gray-800">{transactionsToday.length} Nota</h3></div>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                      <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center"><Icon name="inventory_2" /></div>
+                      <div><p className="text-gray-500 text-xs font-medium">Total Produk Aktif</p><h3 className="text-lg font-bold text-gray-800">{products.length} Item</h3></div>
+                    </div>
+                  </div>
+
+                  {/* Transaksi Terbaru */}
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                       <h3 className="font-bold text-lg text-gray-800">Transaksi Terbaru</h3>
@@ -1376,7 +1445,7 @@
     function AdminProducts({ products, setProducts, categories, syncToSheets }) {
       const [isModalOpen, setIsModalOpen] = useState(false);
       const [editItem, setEditItem] = useState(null);
-      const [formData, setFormData] = useState({ id: '', name: '', price: '', category: '', stock: '' });
+      const [formData, setFormData] = useState({ id: '', name: '', price: '', modal: '', category: '', stock: '' });
 
       const openModal = (item = null) => {
         if (item) { setEditItem(item); setFormData({ ...item }); } 
@@ -1403,8 +1472,9 @@
         const payload = { 
           ...formData, 
           price: parseInt(formData.price) || 0, 
+          modal: parseInt(formData.modal) || 0, // <--- SIMPAN KE DATABASE
           stock: parseInt(formData.stock) || 0,
-          image: formData.image || '' // Mengambil link foto dari inputan baru
+          image: formData.image || '' 
         };
 
         if (editItem) {
@@ -1464,7 +1534,16 @@
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label><select required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">{categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Stok</label><input required type="number" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
                   </div>
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1">Harga (Rp)</label><input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Harga Modal / Beli</label>
+                      <input required type="number" value={formData.modal || ''} onChange={e => setFormData({...formData, modal: e.target.value})} placeholder="Contoh: 8000" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </div>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Harga Jual</label>
+                      <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="Contoh: 10000" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </div>
+                  </div>
                   {/* TAMBAHKAN INPUT LINK FOTO DI SINI */}
                   <div className="pt-2">
                     <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-widest">Link Foto Produk (URL):</label>
