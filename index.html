@@ -1606,117 +1606,138 @@
     }
 
     // ==========================================
-    // MENU RIWAYAT TRANSAKSI (DENGAN FITUR EXPORT PDF)
+    // MENU RIWAYAT TRANSAKSI (DENGAN DETAIL UNTUNG & REKAP PDF)
     // ==========================================
     function AdminHistory({ transactions, storeConfig }) {
 
-      // LOGIKA UNTUK MENGHASILKAN PDF
-        const handleDownloadPDF = () => {
-          try {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('l', 'mm', 'a4'); // l = landscape
-        
-            // PAKSA WARNA HITAM MURNI BUKAN ABU-ABU
-            doc.setTextColor(0, 0, 0);
-            doc.setFontSize(16);
-            doc.text(`Laporan Transaksi - ${storeConfig.name}`, 14, 20);
-            
-            doc.setFontSize(10);
-            doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 28);
-        
-            doc.setLineWidth(0.5);
-            doc.line(14, 32, 280, 32);
-        
-            const tableColumn = ["ID Transaksi", "Kasir", "Tanggal & Waktu", "Metode", "Item", "Total"];
-            const tableRows = transactions.map(trx => [
+      // Fungsi pembantu hitung untung per transaksi
+      const calculateTrxProfit = (items) => {
+        return items.reduce((sum, item) => {
+          const modal = item.modal || 0;
+          return sum + ((item.price - modal) * item.qty);
+        }, 0);
+      };
+
+      const handleDownloadPDF = () => {
+        try {
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF('l', 'mm', 'a4'); 
+
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(16);
+          doc.text(`LAPORAN REKAP TRANSAKSI - ${storeConfig.name}`, 14, 15);
+          
+          doc.setFontSize(10);
+          doc.text(`Periode Laporan: ${new Date().toLocaleDateString('id-ID')}`, 14, 22);
+          doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 27);
+
+          doc.setLineWidth(0.5);
+          doc.line(14, 30, 280, 30);
+
+          // TAMBAH KOLOM KEUNTUNGAN DI PDF
+          const tableColumn = ["ID", "Kasir", "Waktu", "Metode", "Rincian Item", "Keuntungan", "Total"];
+          const tableRows = transactions.map(trx => {
+            const untung = calculateTrxProfit(trx.items);
+            return [
               trx.id,
               trx.cashierId || '-',
               new Date(trx.date).toLocaleString('id-ID'),
               trx.refNumber ? `${trx.method}\n(Ref: ${trx.refNumber})` : (trx.method || 'Cash'),
               trx.items.map(i => `${i.qty}x ${i.name}`).join(', '),
+              formatRp(untung),
               formatRp(trx.total)
-            ]);
-        
-            // Eksekusi autoTable dengan paksaan warna teks
-            doc.autoTable({
-              head: [tableColumn],
-              body: tableRows,
-              startY: 38,
-              theme: 'grid',
-              headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], halign: 'center' },
-              styles: { textColor: [0, 0, 0] }, // PAKSA TEKS TABEL HITAM
-            });
-        
-            const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 40;
-            const grandTotal = transactions.reduce((sum, t) => sum + t.total, 0);
-            
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.setTextColor(0, 0, 0);
-            doc.text(`GRAND TOTAL: ${formatRp(grandTotal)}`, 280, finalY + 10, { align: 'right' });
-        
-            doc.save(`Laporan_Toko_Lek_Heru_${Date.now()}.pdf`);
-          } catch (error) {
-            console.error("Gagal cetak PDF:", error);
-            showAlert({ icon: 'error', title: 'Error', text: 'Gagal membuat PDF. Coba gunakan browser lain.' });
-          }
-        };
+            ];
+          });
+
+          doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 35,
+            theme: 'grid',
+            headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], halign: 'center' },
+            columnStyles: {
+              5: { halign: 'right', fontStyle: 'bold' }, // Kolom Keuntungan
+              6: { halign: 'right', fontStyle: 'bold' }  // Kolom Total
+            },
+            styles: { textColor: [0, 0, 0], fontSize: 9 },
+          });
+
+          const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 40;
+          const grandTotalTransaksi = transactions.reduce((sum, t) => sum + t.total, 0);
+          const grandTotalUntung = transactions.reduce((sum, t) => sum + calculateTrxProfit(t.items), 0);
+          
+          // --- BAGIAN RESUME/RINGKASAN DI BAWAH ---
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          
+          // Garis penutup rekap
+          doc.line(180, finalY + 5, 280, finalY + 5);
+          
+          doc.text(`TOTAL PENGHASILAN KOTOR :`, 180, finalY + 12);
+          doc.text(`${formatRp(grandTotalTransaksi)}`, 280, finalY + 12, { align: 'right' });
+          
+          doc.setTextColor(22, 163, 74); // Warna Hijau buat Untung Bersih
+          doc.text(`TOTAL KEUNTUNGAN BERSIH :`, 180, finalY + 19);
+          doc.text(`${formatRp(grandTotalUntung)}`, 280, finalY + 19, { align: 'right' });
+
+          doc.save(`Laporan_Rekap_${storeConfig.name}_${Date.now()}.pdf`);
+        } catch (error) {
+          console.error("Gagal cetak PDF:", error);
+          showAlert({ icon: 'error', title: 'Error', text: 'Gagal membuat PDF.' });
+        }
+      };
       
       return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
             <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-              <Icon name="history" className="text-indigo-600"/> Riwayat Lengkap & Rekap
+              <Icon name="history" className="text-indigo-600"/> Riwayat Transaksi & Laba
             </h3>
             <button onClick={handleDownloadPDF} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors shadow-sm">
-              <Icon name="picture_as_pdf" /> Download PDF
+              <Icon name="picture_as_pdf" /> Download PDF Rekap
             </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-sm border-b border-gray-100">
-                  <th className="p-4 font-medium">ID Transaksi</th>
+                  <th className="p-4 font-medium">ID</th>
                   <th className="p-4 font-medium">Kasir</th>
-                  <th className="p-4 font-medium">Tanggal & Waktu</th>
-                  <th className="p-4 font-medium">Metode</th> {/* KOLOM BARU */}
+                  <th className="p-4 font-medium">Waktu</th>
+                  <th className="p-4 font-medium">Metode</th>
                   <th className="p-4 font-medium">Rincian Item</th>
+                  <th className="p-4 font-medium text-right bg-emerald-50 text-emerald-700">Keuntungan</th>
                   <th className="p-4 font-medium text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((trx) => (
-                  <tr key={trx.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="p-4 font-bold text-gray-700">{trx.id}</td>
-                    <td className="p-4 font-medium text-indigo-600">{trx.cashierId || '-'}</td>
-                    <td className="p-4 text-gray-600 text-xs">{new Date(trx.date).toLocaleString('id-ID')}</td>
-                    
-                    {/* ISI KOLOM METODE PEMBAYARAN */}
-                    <td className="p-4">
-                      <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
-                        trx.method === 'Cash' ? 'bg-green-100 text-green-700' : 
-                        trx.method === 'MESIN EDC' ? 'bg-blue-100 text-blue-700' : 
-                        'bg-purple-100 text-purple-700'
-                      }`}>
-                        {trx.method || 'Cash'}
-                      </span>
-                      {trx.refNumber && <div className="text-[9px] text-gray-400 mt-1">Ref: {trx.refNumber}</div>}
-                    </td>
-
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1">
-                        {trx.items.map((item, i) => (
-                          <span key={i} className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                            {item.qty}x {item.name}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-4 font-bold text-green-600 text-right">{formatRp(trx.total)}</td>
-                  </tr>
-                ))}
-                {transactions.length === 0 && <tr><td colSpan="6" className="p-12 text-center text-gray-400">Belum ada riwayat transaksi.</td></tr>}
+                {transactions.map((trx) => {
+                  const untungTrx = calculateTrxProfit(trx.items);
+                  return (
+                    <tr key={trx.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="p-4 font-bold text-gray-700">{trx.id}</td>
+                      <td className="p-4 font-medium text-indigo-600">{trx.cashierId || '-'}</td>
+                      <td className="p-4 text-gray-600 text-xs">{new Date(trx.date).toLocaleString('id-ID')}</td>
+                      <td className="p-4 text-xs font-bold uppercase">{trx.method || 'Cash'}</td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1">
+                          {trx.items.map((item, i) => (
+                            <span key={i} className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                              {item.qty}x {item.name}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      {/* KOLOM KEUNTUNGAN DI DASHBOARD */}
+                      <td className="p-4 font-bold text-emerald-600 text-right bg-emerald-50/30">
+                        {formatRp(untungTrx)}
+                      </td>
+                      <td className="p-4 font-bold text-gray-800 text-right">{formatRp(trx.total)}</td>
+                    </tr>
+                  );
+                })}
+                {transactions.length === 0 && <tr><td colSpan="7" className="p-12 text-center text-gray-400">Belum ada riwayat transaksi.</td></tr>}
               </tbody>
             </table>
           </div>
