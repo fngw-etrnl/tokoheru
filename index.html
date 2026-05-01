@@ -579,10 +579,13 @@
           }
 
           // 2. Deteksi kategori: Munculkan form Keterangan di semua kategori KECUALI 3 ini
-          const cat = p.category ? p.category.toLowerCase().trim() : '';
-          const showKeterangan = cat !== 'pulsa' && cat !== 'voucher & kartu' && cat !== 'pulsa pln';
-
-          let extraHtml = '';
+          // const cat = p.category ? p.category.toLowerCase().trim() : '';
+          // const showKeterangan = cat !== 'pulsa' && cat !== 'voucher & kartu' && cat !== 'pulsa pln';
+          
+          // 3. Munculkan form Keterangan di semua kategori
+             const showKeterangan = true;
+          
+        let extraHtml = '';
           if (showKeterangan) {
               extraHtml = `
                   <div class="mb-3">
