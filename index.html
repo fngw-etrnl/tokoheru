@@ -586,7 +586,7 @@
       const addToCart = (p) => {
           if (p.price === 0) {
             // Deteksi otomatis: apakah ini produk pulsa/data?
-            const isTelecom = p.name.toLowerCase().includes('data') || p.name.toLowerCase().includes('pulsa') || p.category.toLowerCase().includes('data') || p.category.toLowerCase().includes('pulsa');
+            const isTelecom = p.name.toLowerCase().includes('data') || p.category.toLowerCase().includes('data');
 
             let extraHtml = '';
             if (isTelecom) {
@@ -606,7 +606,7 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Keterangan / Kuota (Misal: 10GB atau 50rb):</label>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Jumlah Kuota (Misal: 10GB:</label>
                         <input id="swal-keterangan" type="text" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-slate-700" placeholder="Contoh: 10GB / 50.000">
                     </div>
                 `;
