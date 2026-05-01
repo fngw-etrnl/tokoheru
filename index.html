@@ -586,7 +586,7 @@
       const addToCart = (p) => {
           if (p.price === 0) {
             // Deteksi otomatis: apakah ini produk pulsa/data?
-            const isTelecom = p.name.toLowerCase().includes('data') || p.category.toLowerCase().includes('data');
+            const isTelecom = p.name.toLowerCase().includes('data') || p.name.toLowerCase().includes('paket telpon') || p.category.toLowerCase().includes('data') || p.category.toLowerCase().includes('paket telpon');
 
             let extraHtml = '';
             if (isTelecom) {
@@ -604,10 +604,6 @@
                             <option value="BYU">BYU</option>
                             <option value="Lainnya">Lainnya</option>
                         </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Jumlah Kuota (Misal: 10GB:</label>
-                        <input id="swal-keterangan" type="text" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-slate-700" placeholder="Contoh: 10GB / 50.000">
                     </div>
                 `;
             }
@@ -675,10 +671,10 @@
                     // Validasi khusus kalau masuk menu Paket Data / Pulsa
                     if (isTelecom) {
                         const op = document.getElementById('swal-operator').value;
-                        const ket = document.getElementById('swal-keterangan').value;
+                        // const ket = document.getElementById('swal-keterangan').value;
                         
                         if (!op) return window.Swal.showValidationMessage('Pilih Operator dulu, Bro!');
-                        if (!ket) return window.Swal.showValidationMessage('Isi keterangan atau jumlah kuotanya!');
+                        // if (!ket) return window.Swal.showValidationMessage('Isi keterangan atau jumlah kuotanya!');
                         
                         // Gabungin nama biar di struk jadinya keren: "Paket Data - Telkomsel 10GB"
                         finalName = `${p.name} - ${op} ${ket}`;
