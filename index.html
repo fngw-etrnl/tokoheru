@@ -1608,13 +1608,34 @@
     // ==========================================
     // MENU RIWAYAT TRANSAKSI (DENGAN DETAIL UNTUNG & REKAP PDF)
     // ==========================================
+// ==========================================
+    // MENU RIWAYAT TRANSAKSI (DENGAN MODAL, UNTUNG & REKAP PDF)
+    // ==========================================
     function AdminHistory({ transactions, storeConfig }) {
 
-      // Fungsi pembantu hitung untung per transaksi
+      // Fungsi pembantu hitung UNTUNG per transaksi
       const calculateTrxProfit = (items) => {
         return items.reduce((sum, item) => {
           const modal = item.modal || 0;
+          // Fallback manual buat data lama kalau ada
+          if (!item.modal && item.note && item.note.includes('Admin: ')) {
+             const fee = parseInt(item.note.split('Admin: ')[1].replace(/\D/g, '')) || 0;
+             return sum + (fee * item.qty);
+          }
           return sum + ((item.price - modal) * item.qty);
+        }, 0);
+      };
+
+      // Fungsi pembantu hitung MODAL per transaksi
+      const calculateTrxModal = (items) => {
+        return items.reduce((sum, item) => {
+          const modal = item.modal || 0;
+          // Fallback manual buat data lama kalau ada
+          if (!item.modal && item.note && item.note.includes('Nominal: ')) {
+             const nom = parseInt(item.note.split('Nominal: ')[1].split(',')[0].replace(/\D/g, '')) || 0;
+             return sum + (nom * item.qty);
+          }
+          return sum + (modal * item.qty);
         }, 0);
       };
 
@@ -1634,16 +1655,18 @@
           doc.setLineWidth(0.5);
           doc.line(14, 30, 280, 30);
 
-          // TAMBAH KOLOM KEUNTUNGAN DI PDF
-          const tableColumn = ["ID", "Kasir", "Waktu", "Metode", "Rincian Item", "Keuntungan", "Total"];
+          // TAMBAH KOLOM MODAL DI PDF
+          const tableColumn = ["ID", "Kasir", "Waktu", "Metode", "Rincian Item", "Harga Modal", "Keuntungan", "Total (Kotor)"];
           const tableRows = transactions.map(trx => {
             const untung = calculateTrxProfit(trx.items);
+            const modal = calculateTrxModal(trx.items);
             return [
               trx.id,
               trx.cashierId || '-',
               new Date(trx.date).toLocaleString('id-ID'),
               trx.refNumber ? `${trx.method}\n(Ref: ${trx.refNumber})` : (trx.method || 'Cash'),
               trx.items.map(i => `${i.qty}x ${i.name}`).join(', '),
+              formatRp(modal),
               formatRp(untung),
               formatRp(trx.total)
             ];
@@ -1656,8 +1679,9 @@
             theme: 'grid',
             headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], halign: 'center' },
             columnStyles: {
-              5: { halign: 'right', fontStyle: 'bold' }, // Kolom Keuntungan
-              6: { halign: 'right', fontStyle: 'bold' }  // Kolom Total
+              5: { halign: 'right' }, // Kolom Harga Modal
+              6: { halign: 'right', fontStyle: 'bold' }, // Kolom Keuntungan
+              7: { halign: 'right', fontStyle: 'bold' }  // Kolom Total
             },
             styles: { textColor: [0, 0, 0], fontSize: 9 },
           });
@@ -1665,6 +1689,7 @@
           const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 40;
           const grandTotalTransaksi = transactions.reduce((sum, t) => sum + t.total, 0);
           const grandTotalUntung = transactions.reduce((sum, t) => sum + calculateTrxProfit(t.items), 0);
+          const grandTotalModal = transactions.reduce((sum, t) => sum + calculateTrxModal(t.items), 0);
           
           // --- BAGIAN RESUME/RINGKASAN DI BAWAH ---
           doc.setFontSize(11);
@@ -1673,12 +1698,20 @@
           // Garis penutup rekap
           doc.line(180, finalY + 5, 280, finalY + 5);
           
-          doc.text(`TOTAL PENGHASILAN KOTOR :`, 180, finalY + 12);
-          doc.text(`${formatRp(grandTotalTransaksi)}`, 280, finalY + 12, { align: 'right' });
+          // TOTAL MODAL (Warna Abu-abu Gelap)
+          doc.setTextColor(71, 85, 105); 
+          doc.text(`TOTAL HARGA MODAL :`, 180, finalY + 12);
+          doc.text(`${formatRp(grandTotalModal)}`, 280, finalY + 12, { align: 'right' });
           
-          doc.setTextColor(22, 163, 74); // Warna Hijau buat Untung Bersih
-          doc.text(`TOTAL KEUNTUNGAN BERSIH :`, 180, finalY + 19);
-          doc.text(`${formatRp(grandTotalUntung)}`, 280, finalY + 19, { align: 'right' });
+          // TOTAL KOTOR (Warna Hitam)
+          doc.setTextColor(0, 0, 0); 
+          doc.text(`TOTAL PENGHASILAN KOTOR :`, 180, finalY + 19);
+          doc.text(`${formatRp(grandTotalTransaksi)}`, 280, finalY + 19, { align: 'right' });
+          
+          // TOTAL BERSIH (Warna Hijau)
+          doc.setTextColor(22, 163, 74); 
+          doc.text(`TOTAL KEUNTUNGAN BERSIH :`, 180, finalY + 26);
+          doc.text(`${formatRp(grandTotalUntung)}`, 280, finalY + 26, { align: 'right' });
 
           doc.save(`Laporan_Rekap_${storeConfig.name}_${Date.now()}.pdf`);
         } catch (error) {
@@ -1699,7 +1732,7 @@
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[900px]">
+            <table className="w-full text-left border-collapse min-w-[950px]">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-sm border-b border-gray-100">
                   <th className="p-4 font-medium">ID</th>
@@ -1707,6 +1740,7 @@
                   <th className="p-4 font-medium">Waktu</th>
                   <th className="p-4 font-medium">Metode</th>
                   <th className="p-4 font-medium">Rincian Item</th>
+                  <th className="p-4 font-medium text-right bg-orange-50 text-orange-700">Harga Modal</th>
                   <th className="p-4 font-medium text-right bg-emerald-50 text-emerald-700">Keuntungan</th>
                   <th className="p-4 font-medium text-right">Total</th>
                 </tr>
@@ -1714,6 +1748,7 @@
               <tbody>
                 {transactions.map((trx) => {
                   const untungTrx = calculateTrxProfit(trx.items);
+                  const modalTrx = calculateTrxModal(trx.items);
                   return (
                     <tr key={trx.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="p-4 font-bold text-gray-700">{trx.id}</td>
@@ -1729,15 +1764,20 @@
                           ))}
                         </div>
                       </td>
-                      {/* KOLOM KEUNTUNGAN DI DASHBOARD */}
+                      {/* KOLOM HARGA MODAL */}
+                      <td className="p-4 font-medium text-orange-600 text-right bg-orange-50/30">
+                        {formatRp(modalTrx)}
+                      </td>
+                      {/* KOLOM KEUNTUNGAN */}
                       <td className="p-4 font-bold text-emerald-600 text-right bg-emerald-50/30">
                         {formatRp(untungTrx)}
                       </td>
+                      {/* KOLOM TOTAL KOTOR */}
                       <td className="p-4 font-bold text-gray-800 text-right">{formatRp(trx.total)}</td>
                     </tr>
                   );
                 })}
-                {transactions.length === 0 && <tr><td colSpan="7" className="p-12 text-center text-gray-400">Belum ada riwayat transaksi.</td></tr>}
+                {transactions.length === 0 && <tr><td colSpan="8" className="p-12 text-center text-gray-400">Belum ada riwayat transaksi.</td></tr>}
               </tbody>
             </table>
           </div>
